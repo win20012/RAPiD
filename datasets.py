@@ -8,30 +8,26 @@ from collections import defaultdict
 import torch
 import torchvision.transforms.functional as tvf
 
-from utils.utils import normalize_bbox, rect_to_square
+from utils.myutils import normalize_bbox, rect_to_square
 import utils.augmentation as augUtils
 
 
-class Dataset4YoloAngle(torch.utils.data.Dataset):
-    """
-    dataset class.
-    """
-    def __init__(self, img_dir, json_path, img_size=608, augmentation=True,
+class OrientedDataset(torch.utils.data.Dataset):
+    def __init__(self, img_dir, json_path, img_size=608, enable_aug=True,
                  only_person=True, debug_mode=False):
-        """
-        dataset initialization. Annotation data are read into memory by API.
+        """ Pytorch dataset class for oriented object detection
 
         Args:
             img_dir: str or list, imgs folder, e.g. 'someDir/COCO/train2017/'
             json_path: str or list, e.g. 'someDir/COCO/instances_train2017.json'
             img_size: int, target image size input to the YOLO, default: 608
-            augmentation: bool, default: True
-            only_person: bool, if true, non-person BBs are discarded. default: True
+            enable_aug: bool, enable data augmentation or not. default: True
+            only_person: bool, if true, non-person BBs are ignored. default: True
             debug: bool, if True, only one data id is selected from the dataset
         """
         self.max_labels = 50
         self.img_size = img_size
-        self.enable_aug = augmentation
+        self.enable_aug = enable_aug
         self.only_person = only_person
         if only_person:
             print('Only train on person images and objects')
