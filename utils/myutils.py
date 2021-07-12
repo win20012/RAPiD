@@ -1,9 +1,43 @@
-from PIL import Image
+import os
+from pathlib import Path
+import re
 import random
+from PIL import Image
+import numpy as np
 import torch
 from torchvision import transforms
 
 from utils.iou_mask import iou_mask, iou_rle
+
+
+def set_random_seeds(seed=1):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+def increment_dir(dir_root='runs/', name='exp'):
+    """ Increament directory name. E.g., exp1, exp2, exp3, ...
+
+    Args:
+        dir_root (str, optional): root directory. Defaults to 'runs/'.
+        name (str, optional): dir prefix. Defaults to 'exp'.
+    """
+    assert isinstance(dir_root, (str, Path))
+    dir_root = Path(dir_root)
+    if not dir_root.exists():
+        print(f'Warning: {dir_root} does not exist. Creating it...')
+        os.makedirs(dir_root)
+    assert dir_root.is_dir()
+    dnames = [s for s in os.listdir(dir_root) if s.startswith(name)]
+    if len(dnames) > 0:
+        dnames = [s[len(name):] for s in dnames]
+        ids = [int(re.search(r'\d+', s).group()) for s in dnames]
+        n = max(ids) + 1
+    else:
+        n = 0
+    name = f'{name}_{n}'
+    return name
 
 
 def normalize_bbox(xywha, w, h, max_angle=1):
