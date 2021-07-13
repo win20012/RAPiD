@@ -5,14 +5,9 @@ import torch
 from .iou_mask import iou_mask, iou_rle
 
 
-class MWeval():
-    """
-    Custom evaluation tools for rotated bounding boxes.
-    The class name 'MWeval' might be misleading; it doesn't have any relationship with \
-        the Mirror Worlds (MW) dataset.
-    """
+class CustomEval():
     def __init__(self, gt_path, iou_method='rle'):
-        """
+        """ Custom evaluation tools for rotated bounding boxes.
         Args:
             gt_path (str): path point to the ground truth JSON file
             iou_method (str): method to calculate rotated bbox IoU. 'rle' is recommended.
