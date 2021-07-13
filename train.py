@@ -1,12 +1,16 @@
 # This is the main training file we are using
+import time
 import os
 from pathlib import Path
 import argparse
+from tqdm import tqdm
 import random
 from PIL import Image
 import numpy as np
 import cv2
 import torch
+import torch.cuda.amp as amp
+import wandb
 
 from datasets import OrientedDataset
 import utils
@@ -21,10 +25,11 @@ def get_args():
     parser.add_argument('--project',    type=str,  default='fisheye')
     parser.add_argument('--group',      type=str,  default='default')
     parser.add_argument('--wbmode',     type=str,  default='disabled')
+    parser.add_argument('--proxy',      action='store_true')
     # model setting
     parser.add_argument('--model',      type=str,  default='rapid_pL1')
-    parser.add_argument('--initial',    type=str,  default='')
-    parser.add_argument('--resume',     type=str,  default='')
+    parser.add_argument('--initial',    type=str,  default='') # runs/xxx/yyy.pt
+    parser.add_argument('--resume',     type=str,  default='') # run name
     # dataset and loader setting
     parser.add_argument('--dataset',    type=str,  default='coco')
     parser.add_argument('--img_size',   type=int,  default=608, choices=[608, 1024])
@@ -108,6 +113,77 @@ def get_dataset_dirs(name):
     return train_img_dir, train_jspath, val_img_dir, val_jspath
 
 
+def get_optimizer(model, cfg):
+    # different optimization setting for different layers
+    pgb, pgw = [], []
+    for k, v in model.named_parameters():
+        if ('.bn' in k) or ('.bias' in k): # batchnorm or bias
+            pgb.append(v)
+        else: # conv weights
+            assert '.weight' in k, f'name={k}, shape={v.shape}'
+            pgw.append(v)
+
+    parameters = [
+        {'params': pgb, 'lr': cfg.lr, 'weight_decay': 0.0},
+        {'params': pgw, 'lr': cfg.lr, 'weight_decay': cfg.weight_decay},
+    ]
+    print('Parameter groups:', [len(pg['params']) for pg in parameters])
+
+    optimizer = torch.optim.SGD(parameters, lr=cfg.lr, momentum=cfg.momentum, 
+                                weight_decay=cfg.weight_decay)
+    return optimizer
+
+
+def initialize_wandb(cfg):
+    log_parent = Path(f'runs/{cfg.project}')
+    if cfg.resume: # resume from an existing experiment
+        log_dir = log_parent / cfg.resume
+        wb_id = open(log_dir / 'wandb_id.txt', 'r').read()
+        print(f'resumming from {log_dir}...')
+    else: # new experiment
+        _base = f'{cfg.model}_{cfg.dataset}'
+        run_name = utils.increment_dir(dir_root=log_parent, name=_base)
+        log_dir = log_parent / run_name # wandb logging dir
+        print(f'logging to {log_dir}...')
+        os.makedirs(log_dir, exist_ok=False)
+        wb_id = None
+
+    # initialize wandb
+    if cfg.proxy:
+        os.environ["HTTPS_PROXY"] = "http://127.0.0.1:7890"
+    wbrun = wandb.init(project=cfg.project, group=cfg.group, name=run_name, config=cfg,
+                       dir='runs/', resume='allow', id=wb_id, mode=cfg.wbmode)
+    cfg = wbrun.config
+    cfg.log_dir = log_dir
+    cfg.wandb_id = wbrun.id
+    with open(log_dir / 'wandb_id.txt', 'w') as f:
+        f.write(wbrun.id)
+    return wbrun, log_dir
+
+
+class Evaluator():
+    def __init__(self, val_img_dir, val_jspath, img_size):
+        self.img_dir = val_img_dir
+        self.val_func = utils.CustomEval(val_jspath, iou_method='rle')
+        self.img_size = img_size
+
+    def validate_log(self, model):
+        print(f'Evaluating {type(model)}...')
+        tic = time.time()
+        model.eval()
+        model_eval = api.Detector(conf_thres=0.01, model=model)
+        dts = model_eval.detect_imgSeq(self.val_img_dir, input_size=self.img_size)
+        msg = self.val_func.evaluate_dtList(dts, metric='AP')
+        # print(msg)
+        print(f'\nValidation elapsed time: {time.time()-tic:.1f}s')
+        results = {
+            'ap50': self.val_func._getAP(0.5),
+            'ap75': self.val_func._getAP(0.75),
+            'ap': self.val_func._getAP()
+        }
+        return results
+
+
 def main():
     # get config
     cfg = get_args()
@@ -134,11 +210,12 @@ def main():
     # dataset setting
     print('initialing dataloader...')
     train_img_dir, train_jspath, val_img_dir, val_jspath = get_dataset_dirs(cfg.dataset)
-    dataset = OrientedDataset(train_img_dir, train_jspath, cfg.img_size, True,
+    trainset = OrientedDataset(train_img_dir, train_jspath, cfg.img_size, True,
                                 only_person=True, debug_mode=cfg.debug)
-    dataloader = torch.utils.data.DataLoader(dataset, batch_size=cfg.bs, 
+    trainloader = torch.utils.data.DataLoader(trainset, batch_size=cfg.bs, 
                 shuffle=True, num_workers=cfg.workers, pin_memory=True, drop_last=False)
-    dataiterator = iter(dataloader)
+    # validation set
+    evaluator = Evaluator(val_img_dir, val_jspath, cfg.img_size)
 
     if cfg.model == 'rapid_pL1':
         from models.rapid import RAPiD
@@ -149,69 +226,52 @@ def main():
         model = RAPiD(backbone='dark53', img_norm=False,
                        loss_angle='period_L2')
     else: raise NotImplementedError()
+    model = model.to(device=device)
 
-    model = model.cuda()
+    optimizer = get_optimizer()
 
-    job_name = f'{cfg.model}_{cfg.backbone}_{cfg.dataset}{target_size}'
+    # AMP
+    scaler = amp.GradScaler(enabled=cfg.amp)
 
-    start_iter = -1
-    if cfg.checkpoint:
-        print("loading ckpt...", cfg.checkpoint)
-        weights_path = os.path.join('./weights/', cfg.checkpoint)
-        state = torch.load(weights_path)
-        model.load_state_dict(state['model'])
-        start_iter = state['iter']
-
-    val_set = MWtools.MWeval(val_json, iou_method='rle')
-    eval_img_names = os.listdir('./images/')
-    eval_img_paths = [os.path.join('./images/',s) for s in eval_img_names]
-    logger = SummaryWriter(f'./logs/{job_name}')
-
-    # optimizer setup
-    params = []
-    # set weight decay only on conv.weight
-    for key, value in model.named_parameters():
-        if 'conv.weight' in key:
-            params += [{'params':value, 'weight_decay':decay_SGD}]
-        else:
-            params += [{'params':value, 'weight_decay':0.0}]
-
-    if cfg.dataset == 'COCO':
-        optimizer = torch.optim.SGD(params, lr=lr_SGD, momentum=0.9, dampening=0,
-                                    weight_decay=decay_SGD)
-    elif cfg.dataset in {'MW', 'HBCP', 'HBMW', 'CPMW'}:
-        assert cfg.checkpoint is not None
-        optimizer = torch.optim.SGD(params, lr=lr_SGD)
+    # wandb
+    wbrun, log_dir = initialize_wandb(cfg)
+    if cfg.resume: # resume run
+        assert not cfg.initial
+        checkpoint = torch.load(log_dir / 'last.pt')
+        model.load_state_dict(checkpoint['model'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        scaler.load_state_dict(checkpoint['scaler'])
+        start_epoch = checkpoint['epoch'] + 1
+        best_fitness = checkpoint['ap50']
     else:
-        raise NotImplementedError()
+        start_epoch, best_fitness = 0, 0.0
+        if cfg.initial: # initialize network from weights
+            checkpoint = torch.load(cfg.initial)
+            model.load_state_dict(checkpoint['model'], strict=False)
 
-    if cfg.dataset not in cfg.checkpoint:
-        start_iter = -1
-    else:
-        optimizer.load_state_dict(state['optimizer_state_dict'])
-        print(f'begin from iteration: {start_iter}')
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, burnin_schedule, last_epoch=start_iter)
-
-    # start training loop
-    today = timer.today()
-    start_time = timer.tic()
-    for iter_i in range(start_iter, 500000):
-        # evaluation
-        if iter_i % cfg.eval_interval == 0 and (cfg.dataset != 'COCO' or iter_i > 0):
-            with timer.contexttimer() as t0:
-                model.eval()
-                model_eval = api.Detector(conf_thres=0.005, model=model)
-                dts = model_eval.detect_imgSeq(val_img_dir, input_size=target_size)
-                str_0 = val_set.evaluate_dtList(dts, metric='AP')
-            s = f'\nCurrent time: [ {timer.now()} ], iteration: [ {iter_i} ]\n\n'
-            s += str_0 + '\n\n'
-            s += f'Validation elapsed time: [ {t0.time_str} ]'
-            print(s)
-            logger.add_text('Validation summary', s, iter_i)
-            logger.add_scalar('Validation AP[IoU=0.5]', val_set._getAP(0.5), iter_i)
-            logger.add_scalar('Validation AP[IoU=0.75]', val_set._getAP(0.75), iter_i)
-            logger.add_scalar('Validation AP[IoU=0.5:0.95]', val_set._getAP(), iter_i)
+    # ======================== start training ========================
+    pbar_title = ('%-8s' * 9) % (
+        'Epoch', 'GPU_mem', 'lr', 'xy', 'wh', 'angle','conf', 'loss', 'ap50'
+    )
+    n_iter = start_epoch * len(trainloader)
+    print('Start training...\n')
+    for n_epoch in range(start_epoch, cfg.epochs):
+        # evaluation and save checkpoint
+        if not (cfg.skip_0eval and (n_epoch == 0)):
+            _log_dic = {'general/epoch': n_epoch}
+            results = evaluator.validate_log(model)
+            _log_dic.update({'metric/plain_val_'+k: v for k,v in results.items()})
+            if cfg.ema:
+                results = results = evaluator.validate_log(ema.ema)
+                _log_dic.update({f'metric/ema_val_'+k: v for k,v in results.items()})
             model.train()
+
+        train_loss, train_acc = 0.0, 0.0
+        time.sleep(0.1)
+        print('\n' + pbar_title) # title
+        pbar = tqdm(enumerate(trainloader), total=len(trainloader))
+        for bi, (imgs, targets) in pbar:
+            n_iter = n_epoch * len(trainloader) + bi
 
         # subdivision loop
         optimizer.zero_grad()
