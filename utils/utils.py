@@ -94,6 +94,7 @@ def detection2original(boxes, pad_info):
     Args:
         boxes: tensor, rows of [cx, cy, w, h, angle]
         pad_info: (ori w, ori h, tl x, tl y, imw, imh)
+    return : center point with width and height
     '''
     assert boxes.dim() == 2
     ori_w, ori_h, tl_x, tl_y, imw, imh = pad_info

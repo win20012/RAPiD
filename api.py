@@ -43,7 +43,7 @@ class Detector():
         model.load_state_dict(torch.load(weights_path)['model'])
         print(f'Successfully loaded weights: {weights_path}')
         model.eval()
-        if kwargs.get('use_cuda', True):
+        if kwargs.get('use_cuda', False):
             print("Using CUDA...")
             assert torch.cuda.is_available()
             self.model = model.cuda()
@@ -69,12 +69,12 @@ class Detector():
         assert 'img_path' in kwargs or 'pil_img' in kwargs
         img = kwargs.pop('pil_img', None) or Image.open(kwargs['img_path'])
 
-        detections = self._predict_pil(img, **kwargs)
+        detections = self._predict_pil(img, **kwargs) 
 
         if kwargs.get('return_img', False):
             np_img = np.array(img)
             visualization.draw_dt_on_np(np_img, detections, **kwargs)
-            return np_img
+            return np_img, detections
         if kwargs.get('visualize', False):
             np_img = np.array(img)
             visualization.draw_dt_on_np(np_img, detections, **kwargs)
@@ -113,21 +113,21 @@ class Detector():
 
         return detection_json
     
-    def _predict_pil(self, pil_img, **kwargs):
-        '''
-        Args:
-            pil_img: PIL.Image.Image
-            input_size: int, input resolution
-            conf_thres: float, confidence threshold
-        '''
-        input_size = kwargs.get('input_size', self.input_size)
-        conf_thres = kwargs.get('conf_thres', self.conf_thres)
-        assert isinstance(pil_img, Image.Image), 'input must be a PIL.Image'
-        assert input_size is not None, 'Please specify the input resolution'
-        assert conf_thres is not None, 'Please specify the confidence threshold'
+    def _predict_pil(self, pil_img, **kwargs): 
+        ''' 
+        Args: 
+            pil_img: PIL.Image.Image 
+            input_size: int, input resolution 
+            conf_thres: float, confidence threshold 
+        ''' 
+        input_size = kwargs.get('input_size', self.input_size) 
+        conf_thres = kwargs.get('conf_thres', self.conf_thres) 
+        assert isinstance(pil_img, Image.Image), 'input must be a PIL.Image' 
+        assert input_size is not None, 'Please specify the input resolution' 
+        assert conf_thres is not None, 'Please specify the confidence threshold' 
 
-        # pad to square
-        input_img, _, pad_info = utils.rect_to_square(pil_img, None, input_size, 0)
+        # pad to square 
+        input_img, _, pad_info = utils.rect_to_square(pil_img, None, input_size, 0) 
 
         input_ori = tvf.to_tensor(input_img)
         input_ = input_ori.unsqueeze(0)
