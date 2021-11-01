@@ -1,6 +1,7 @@
 import requests
-from mylib.config import five_mins, people_change
+#from mylib.config import five_mins, people_change
 import datetime
+from mylib.config import request_API
   
 # defining the api-endpoint 
 #http://192.168.13.250:7001/api/createEvent?source=CFA&caption=%E4%BA%BA%E5%93%A1%E9%80%B2%E5%87%BA&description=enter:100%0D%0Aexit:95%0D%0Atotal:5
@@ -9,7 +10,7 @@ import datetime
 
 #API_ENDPOINT = "http://192.168.13.250:7001/api/createEvent/"
 def send_req(enter,exit):
-        API_ENDPOINT = "http://admin:hdit23059797@192.168.13.250:7001/api/createEvent/"
+        API_ENDPOINT = request_API
         #http://admin:hdit23059797@192.16813.250:7001/api/createEvent
         # your API key here
         #API_KEY = "admin:hdit23059797"

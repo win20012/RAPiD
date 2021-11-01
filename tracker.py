@@ -20,6 +20,11 @@ from itertools import zip_longest
 from Lineiterator import createLineIterator
 from limitexceed import check_exceed
 from get_requests import send_req
+import pandas as pd
+import datetime
+from os.path import exists
+import openpyxl
+from excel_appender import append_df_to_excel
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 def cv2pil(imgCV):
@@ -39,7 +44,7 @@ H = None
 # hi = height and wi = width
 #hi=373
 #wi=500
-hi=500
+hi=375
 wi=500
 #specify points here the line will be draw from x1,y1 to x2,y2
 #note that when hi = 0, it will be at the top and when hi = max it will be at the bottom
@@ -98,11 +103,14 @@ totalUp = 0
 empty=[]
 empty1=[]
 
-cap = cv2.VideoCapture('videos/testvid.mp4')
+cap = VideoStream(src=config.url).start()
 
-while(cap.isOpened()):
+if config.Thread:
+		vs = thread.ThreadingClass(config.url)
+
+while True:
     # フレームを取得
-    ret, frame = cap.read()
+    frame = cap.read()
 
     try:
         frame = imutils.resize(frame, width = 500)
@@ -119,8 +127,8 @@ while(cap.isOpened()):
         print('(H, W) = frame.shape[:2] error')
         raise AttributeError  
 
-    if ret == False:
-        break
+    #if ret == False:
+       # break
     #pil_img1=cv2pil(frame)
     #npobj=detector(model_name='rapid',)
     np_img, detections = detector.detect_one(pil_img=cv2pil(frame),
@@ -430,10 +438,16 @@ while(cap.isOpened()):
 
     	# draw both the ID of the object and the centroid of the
 			# object on the output frame
-    text = "ID {}".format(objectID)
-    cv2.putText(np_img2, text, (centroid[0] - 10, centroid[1] - 10),
-        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
-    cv2.circle(np_img2, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
+    try:
+        assert objectID
+        assert centroid
+        text = "ID {}".format(objectID)
+        cv2.putText(np_img2, text, (centroid[0] - 10, centroid[1] - 10),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+        cv2.circle(np_img2, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
+    except (AssertionError,ValueError):
+        pass
+    
 
     for (i, (k, v)) in enumerate(info):
         text = "{}: {}".format(k, v)
@@ -443,6 +457,45 @@ while(cap.isOpened()):
         text = "{}: {}".format(k, v)
         cv2.putText(np_img2, text, (265, hi - ((i * 20) + 60)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
         
+    # Initiate a simple log to save data at end of the day
+    if config.Log:
+
+        try:
+            timeinxmins
+        except NameError:
+            timeinxmins=datetime.datetime.now() + config.timedel
+
+        if datetime.datetime.now() >= timeinxmins:
+            #if not ex_list:
+                 #ex_list=[]
+            #if not en_list:
+                #en_list=[]
+            #if not in_list:
+                #in_list=[]
+            #if not time_list:
+                #time_list=[]
+            #people_ex=info[0][1]
+            #people_en=info[1][1]
+            #people_in=info2[0][1]
+
+            #ex_list.append(info[0][1])
+            #en_list.append(info[1][1])
+            #in_list.append(info2[0][1])
+            #time_list.append(datetime.datetime.now())
+
+            data={'櫃位地點':config.cam_place,'People Enter':info[1][1],'People Exit':info[0][1],'Current People Inside':info2[0][1],'Date':datetime.datetime.now()}
+            df=pd.DataFrame(data=data)
+            timeinxmins=datetime.datetime.now() + config.timedel
+            excel_name="./summary/people counting summary.xlsx"
+            if exists(excel_name):
+                #with pd.ExcelWriter(excel_name,mode='a')  as writer:
+                append_df_to_excel(excel_name, df,header=None, index=False)    
+            else:
+                df.to_excel(excel_name,index=False)
+            print('summary exported!')
+        
+
+
     cv2.line(np_img2, (int(round(x1)), int(round(y1))), (int(round(x2)), int(round(y2))), (0, 0, 255), 3)
 
     cv2.imshow("Frame", np_img2)
