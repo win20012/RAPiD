@@ -13,7 +13,6 @@ from imutils.video import FPS
 from mylib.mailer import Mailer
 from mylib import config, thread
 import time, schedule, csv
-import numpy as np
 import argparse, imutils
 import time, dlib, cv2, datetime
 from itertools import zip_longest
@@ -23,7 +22,6 @@ from get_requests import send_req
 import pandas as pd
 import datetime
 from os.path import exists
-import openpyxl
 from excel_appender import append_df_to_excel
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
