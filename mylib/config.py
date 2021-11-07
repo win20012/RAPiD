@@ -18,7 +18,7 @@ Thread = False
 # Simple log to log the counting data
 Log = True
 # choose the time to updateLog below, for example if we want to update every 1 hour it would be write as timedel= datetime.timedelta(seconds=0,minutes=0,hours=1,days=0,weeks=0)
-timedel= datetime.timedelta(seconds=10,minutes=0,hours=0,days=0,weeks=0)
+timedel= datetime.timedelta(seconds=0,minutes=0,hours=1,days=0,weeks=0)
 # camera place name
 cam_place='1st floor'
 ####################

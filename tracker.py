@@ -23,6 +23,7 @@ import pandas as pd
 import datetime
 from os.path import exists
 from excel_appender import append_df_to_excel
+from excel_data_converter import create_summary, data_converter
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 def cv2pil(imgCV):
@@ -464,32 +465,16 @@ while True:
             timeinxmins=datetime.datetime.now() + config.timedel
 
         if datetime.datetime.now() >= timeinxmins:
-            #if not ex_list:
-                 #ex_list=[]
-            #if not en_list:
-                #en_list=[]
-            #if not in_list:
-                #in_list=[]
-            #if not time_list:
-                #time_list=[]
-            #people_ex=info[0][1]
-            #people_en=info[1][1]
-            #people_in=info2[0][1]
-
-            #ex_list.append(info[0][1])
-            #en_list.append(info[1][1])
-            #in_list.append(info2[0][1])
-            #time_list.append(datetime.datetime.now())
-
-            data={'櫃位地點':config.cam_place,'People Enter':info[1][1],'People Exit':info[0][1],'Current People Inside':info2[0][1],'Date':datetime.datetime.now()}
-            df=pd.DataFrame(data=data)
+            #data={'櫃位地點':config.cam_place,'People Enter':info[1][1],'People Exit':info[0][1],'Current People Inside':info2[0][1],'Date':datetime.datetime.now()}
+            #df=pd.DataFrame(data=data)
             timeinxmins=datetime.datetime.now() + config.timedel
             excel_name="./summary/people counting summary.xlsx"
             if exists(excel_name):
                 #with pd.ExcelWriter(excel_name,mode='a')  as writer:
-                append_df_to_excel(excel_name, df,header=None, index=False)    
+                #append_df_to_excel(excel_name, df,header=None, index=False)
+                data_converter(info[1][1],info[0][1])  
             else:
-                df.to_excel(excel_name,index=False)
+                create_summary(info[1][1],info[0][1])
             print('summary exported!')
         
 

@@ -1,0 +1,61 @@
+import pandas as pd
+import datetime
+from mylib.config import cam_place
+
+def data_converter(enter,exit):
+    #data={datetime.today().strftime('%Y-%m-%d'):config.cam_place,'People Enter':info[1][1],'People Exit':info[0][1],'Current People Inside':info2[0][1],'Date':datetime.datetime.now()}
+    pass
+    df=pd.read_excel("./summary/people counting summary.xlsx")
+    ex_time=[f'{i}:00:00' for i in range(24)]
+    dt_obj=[datetime.datetime.strptime(i,'%H:%M:%S') for i in df.iloc[:,0]]
+    for i in dt_obj:
+        if datetime.datetime.now().time() <= i.time():
+            rownum=dt_obj.index(i)
+            break
+        else:
+            continue
+    #print(df.T)
+    #print(df.columns[-1])
+    if datetime.datetime.now().strftime('%Y-%m-%d') != df.columns[-1]:
+        data=['NA' if i != rownum else enter-exit for i in range(24)]
+        df[str(datetime.datetime.now().strftime('%Y-%m-%d'))]=data
+    else:
+        today_data=df.loc[:,str(datetime.datetime.now().strftime('%Y-%m-%d'))]
+        today_data=today_data.to_list()
+        today_data[rownum]=enter-exit
+        df[datetime.datetime.now().strftime('%Y-%m-%d')]=today_data
+        df.index=ex_time
+        df.index.name = 'Time'
+        df.drop('Time',axis=1,inplace=True)
+        #print(df)
+        #print(today_data)
+    #df2=pd.DataFrame()
+    df.to_excel("./summary/people counting summary.xlsx")
+
+data_converter(15,2)
+
+def create_summary(enter,exit):
+    #data={'櫃位地點':cam_place,'People Enter':info[1][1],'People Exit':info[0][1],'Current People Inside':info2[0][1],'Date':datetime.datetime.now()}
+    
+    ex_time=[f'{i}:00:00' for i in range(24)]
+    #print(ex_time)
+    dt_obj=[datetime.datetime.strptime(i,'%H:%M:%S') for i in ex_time]
+    for i in dt_obj:
+        if datetime.datetime.now().time() <= i.time():
+            rownum=dt_obj.index(i)
+            break
+        else:
+            continue
+    #print(ex_time)    
+    #print(datetime.datetime.now())
+    #print(rownum)
+    datal3=['NA' if i != rownum else enter-exit for i in range(24)]
+    #print(datal)
+    data={datetime.datetime.now().strftime('%Y-%m-%d'):datal3}
+    #print(data)
+    df=pd.DataFrame(data=data,index=ex_time,columns=[datetime.datetime.now().strftime('%Y-%m-%d')])
+    df.index.name = 'Time'
+    df.to_excel("./summary/people counting summary.xlsx")
+#create_summary(5,2)
+
+
