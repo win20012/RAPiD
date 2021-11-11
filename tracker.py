@@ -24,6 +24,7 @@ import datetime
 from os.path import exists
 from excel_appender import append_df_to_excel
 from excel_data_converter import create_summary, data_converter
+from mylib.config import x1,y1,x2,y2, vertical_direction, enter_direction,hi,wi
 
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 def cv2pil(imgCV):
@@ -32,38 +33,11 @@ def cv2pil(imgCV):
     return imgPIL  
 
 detector = Detector(model_name='rapid',
-                    weights_path='./weights/pL1_MWHB1024_Mar11_4000.ckpt',use_cuda=True)
+                    weights_path='./weights/pL1_MWHB1024_Mar11_4000.ckpt',use_cuda=False)
 
 W = None
 H = None
 
-############ Win's modification parameters ##################
-# height and width of frame
-# start running the video first, it's height and width will be printed in the cmd then type it in here
-# hi = height and wi = width
-#hi=373
-#wi=500
-hi=375
-wi=500
-#specify points here the line will be draw from x1,y1 to x2,y2
-#note that when hi = 0, it will be at the top and when hi = max it will be at the bottom
-x1=0
-y1=hi  // 2
-x2=wi
-y2=hi  // 2
-#x1=wi  * 0.50
-#y1=hi
-#x2=wi * 0.75
-#y2=0
-# set vertical_direction to 1 for catagorize people in a vertical movement
-# set to 0 for catagorize people by horizon movement
-# if the line has a negative or positive slope, set to 0 or 1 will do
-#0 will use movement up/downward for calculations, 1 will use movement left/right for calculations
-vertical_direction = 1
-#Specify enter side 
-# if vertical_direction = 1 , use "up" for enter up and "down" for enter down
-# if vertical_direction = 0 , use "left" for enter left side and "right" for enter right side
-enter_direction = 'down'
 #time
 if config.five_mins == True:
     now=datetime.datetime.now()
@@ -444,9 +418,16 @@ while True:
         cv2.putText(np_img2, text, (centroid[0] - 10, centroid[1] - 10),
             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
         cv2.circle(np_img2, (centroid[0], centroid[1]), 4, (255, 255, 255), -1)
-    except (AssertionError,ValueError):
+    except (AssertionError,ValueError,NameError):
         pass
     
+    if info2[0][1] >= config.Threshold:
+							cv2.putText(frame, "-ALERT: People limit exceeded-", (10, frame.shape[0] - 80),
+								cv2.FONT_HERSHEY_COMPLEX, 0.5, (0, 0, 255), 2)
+							if config.ALERT:
+								print("[INFO] Sending email alert..")
+								Mailer().send(config.MAIL)
+								print("[INFO] Alert sent")
 
     for (i, (k, v)) in enumerate(info):
         text = "{}: {}".format(k, v)
