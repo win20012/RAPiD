@@ -31,7 +31,7 @@ Thread = True
 # hi = height and wi = width
 #hi=373
 #wi=500
-hi=375
+hi=500
 wi=500
 
 #specify points here the line will be draw from x1,y1 to x2,y2

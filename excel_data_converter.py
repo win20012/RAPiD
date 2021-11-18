@@ -7,13 +7,18 @@ def data_converter(enter,exit):
     ex_time=[f'{i}:00:00' for i in range(24)]
     dt_obj=[datetime.datetime.strptime(str(i),'%H:%M:%S') for i in df.iloc[:,0]]
     for i in dt_obj:
-        if datetime.datetime.now().time() <= i.time():
-            rownum=dt_obj.index(i)
+        if i.time() >= datetime.datetime.now().time() :
+            j=dt_obj.index(i)
+            rownum=j-1
+            break
+        elif datetime.datetime.now().time() >= dt_obj[-1].time():
+            rownum=int(23)
             break
         else:
             continue
     #print(df.T)
     #print(df.columns[-1])
+    #still roday
     if datetime.datetime.now().strftime('%Y-%m-%d') != df.columns[-1]:
         data=['NA' if i != rownum else enter-exit for i in range(24)]
         df[str(datetime.datetime.now().strftime('%Y-%m-%d'))]=data
@@ -21,10 +26,15 @@ def data_converter(enter,exit):
         df.index.name = 'Time'
         df.drop('Time',axis=1,inplace=True)
 
+    #new day
     else:
         today_data=df.loc[:,str(datetime.datetime.now().strftime('%Y-%m-%d'))]
         today_data=today_data.to_list()
-        today_data[rownum]=enter-exit
+        try:
+            today_data[rownum]=enter-exit
+        except UnboundLocalError:
+            today_data[0]=enter-exit
+
         df[datetime.datetime.now().strftime('%Y-%m-%d')]=today_data
         df.index=ex_time
         df.index.name = 'Time'
@@ -43,8 +53,12 @@ def create_summary(enter,exit):
     #print(ex_time)
     dt_obj=[datetime.datetime.strptime(str(i),'%H:%M:%S') for i in ex_time]
     for i in dt_obj:
-        if datetime.datetime.now().time() <= i.time():
-            rownum=dt_obj.index(i)
+        if i.time() >= datetime.datetime.now().time() :
+            j=dt_obj.index(i)
+            rownum=j-1
+            break
+        elif datetime.datetime.now().time() >= dt_obj[-1].time():
+            rownum=int(23)
             break
         else:
             continue
