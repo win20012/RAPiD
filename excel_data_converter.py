@@ -44,7 +44,7 @@ def data_converter(enter,exit):
     #df2=pd.DataFrame()
     df.to_excel("./summary/people counting summary.xlsx")
 
-data_converter(15,2)
+#data_converter(15,2)
 
 def create_summary(enter,exit):
     #data={'櫃位地點':cam_place,'People Enter':info[1][1],'People Exit':info[0][1],'Current People Inside':info2[0][1],'Date':datetime.datetime.now()}
