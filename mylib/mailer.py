@@ -1,5 +1,5 @@
 import smtplib, ssl
-from config import sender_email,sender_email_password
+from mylib.config import sender_email,sender_email_password
 class Mailer:
 
     """
