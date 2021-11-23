@@ -28,6 +28,9 @@ from mylib.config import x1,y1,x2,y2, vertical_direction, enter_direction,hi,wi
 
 
 def run():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-cam", "--camera", required=True,type=str,help="summary camera name")
+    args = vars(ap.parse_args())
     ImageFile.LOAD_TRUNCATED_IMAGES = True
     def cv2pil(imgCV):
         imgCV_RGB = cv2.cvtColor(imgCV, cv2.COLOR_BGR2RGB)
@@ -459,7 +462,8 @@ def run():
                 #data={'櫃位地點':config.cam_place,'People Enter':info[1][1],'People Exit':info[0][1],'Current People Inside':info2[0][1],'Date':datetime.datetime.now()}
                 #df=pd.DataFrame(data=data)
                 timeinxmins=datetime.datetime.now() + config.timedel
-                excel_name="./summary/people counting summary.xlsx"
+                cam_place=str(args["camera"])
+                excel_name=f"./summary/{cam_place} summary.xlsx"
                 if exists(excel_name):
                     #with pd.ExcelWriter(excel_name,mode='a')  as writer:
                     #append_df_to_excel(excel_name, df,header=None, index=False)

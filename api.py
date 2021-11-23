@@ -20,6 +20,7 @@ class Detector():
         conf_thres: float, confidence threshold
         input_size: int, input resolution
     '''
+    
     def __init__(self, model_name='', weights_path=None, model=None, **kwargs):
         # post-processing settings
         self.conf_thres = kwargs.get('conf_thres', None)
