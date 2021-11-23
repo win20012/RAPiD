@@ -467,9 +467,9 @@ def run():
                 if exists(excel_name):
                     #with pd.ExcelWriter(excel_name,mode='a')  as writer:
                     #append_df_to_excel(excel_name, df,header=None, index=False)
-                    data_converter(info[1][1],info[0][1])  
+                    data_converter(info[1][1],info[0][1],excel_name)  
                 else:
-                    create_summary(info[1][1],info[0][1])
+                    create_summary(info[1][1],info[0][1],excel_name)
                 print('summary exported!')
             
 
