@@ -495,6 +495,9 @@ if config.Scheduler:
 	#schedule.every().day.at("9:00").do(run)
 
 	while 1:
-		schedule.run_pending()
+            try:
+                schedule.run_pending()
+            except:
+                pass
 else:
     run()
