@@ -12,10 +12,10 @@ from imutils.video import FPS
 #from imutils import resize
 from mylib.mailer import Mailer
 from mylib import config, thread
-import time, schedule, csv
+import schedule
 import argparse, imutils
-import time, dlib, cv2, datetime
-from itertools import zip_longest
+import cv2, datetime
+
 from Lineiterator import createLineIterator
 from limitexceed import check_exceed
 from get_requests import send_req
@@ -25,72 +25,94 @@ from os.path import exists
 from excel_appender import append_df_to_excel
 from excel_data_converter import create_summary, data_converter
 from mylib.config import x1,y1,x2,y2, vertical_direction, enter_direction,hi,wi
+from multiprocessing import Queue, Process
+import queue
+
+class variable:
+    def __init__(self):
+        self.ct = CentroidTracker(maxDisappeared=40, maxDistance=50)
+        self.trackers=[]
+        self.trackableObjects={}
+        self.totalFrames=0
+        self.x=[]
+        self.totalDown=0
+        self.totalUp=0
+        self.empty=[]
+        self.empty1=[]
+        self.cap=cv2.VideoCapture(config.url)
+        self.H = None
+        self.W= None
+        self.fivemin= datetime.datetime.now()+datetime.timedelta(0,300)
+        self.writer = None
+        self.do_malier = 1
+
+var=variable() 
 
 
-def run():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-cam", "--camera", required=True,type=str,help="summary camera name")
-    args = vars(ap.parse_args())
-    ImageFile.LOAD_TRUNCATED_IMAGES = True
-    def cv2pil(imgCV):
-        imgCV_RGB = cv2.cvtColor(imgCV, cv2.COLOR_BGR2RGB)
-        imgPIL = Image.fromarray(imgCV_RGB)
-        return imgPIL  
+ap = argparse.ArgumentParser()
+ap.add_argument("-cam", "--camera", required=True,type=str,help="summary camera name")
+args = vars(ap.parse_args())
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+def cv2pil(imgCV):
+    imgCV_RGB = cv2.cvtColor(imgCV, cv2.COLOR_BGR2RGB)
+    imgPIL = Image.fromarray(imgCV_RGB)
+    return imgPIL  
 
-    detector = Detector(model_name='rapid',
-                        weights_path='./weights/pL1_MWHB1024_Mar11_4000.ckpt',use_cuda=False)
+detector = Detector(model_name='rapid',
+                    weights_path='./weights/pL1_MWHB1024_Mar11_4000.ckpt',use_cuda=False)
 
-    W = None
-    H = None
+#time
+if config.five_mins == True:
+    now=datetime.datetime.now()
+    fivemin= now+datetime.timedelta(0,300)
+if config.people_change == True:
+    peoplechangelist= []
+###################################
+try:
+    m = ((-1*y2)-y1)/((x2)-x1)
+except:
+    m = 1000000001
+print(m)
+# m = (y2-y1)/(x2-x1)
+# 0,0 -w // 2, -hi
+#print(m)
+iterlist=createLineIterator(np.array([int(round(x1)), int(round(y1))]),np.array([int(round(x2)), int(round(y2))]))
+#cv2.line(frame, (0, int(round(0))), (W // 2, int(round(H))), (0, 0, 0), 3)
+#iterlist=createLineIterator(np.array([0, round(hi * 0.8)]),np.array([wi, round(hi * 0.80)]))
+#iterlist= [(x,hi-y) for (x,y) in iterlist]
+#print(iterlist)
+#print(iterlist)
+# instantiate our centroid tracker, then initialize a list to store
+# each of our dlib correlation trackers, followed by a dictionary to
+# map each unique object ID to a TrackableObject
 
-    #time
-    if config.five_mins == True:
-        now=datetime.datetime.now()
-        fivemin= now+datetime.timedelta(0,300)
-    if config.people_change == True:
-        peoplechangelist= []
-    ###################################
-    try:
-        m = ((-1*y2)-y1)/((x2)-x1)
-    except:
-        m = 1000000001
-    print(m)
-    # m = (y2-y1)/(x2-x1)
-    # 0,0 -w // 2, -hi
-    #print(m)
-    iterlist=createLineIterator(np.array([int(round(x1)), int(round(y1))]),np.array([int(round(x2)), int(round(y2))]))
-    #cv2.line(frame, (0, int(round(0))), (W // 2, int(round(H))), (0, 0, 0), 3)
-    #iterlist=createLineIterator(np.array([0, round(hi * 0.8)]),np.array([wi, round(hi * 0.80)]))
-    #iterlist= [(x,hi-y) for (x,y) in iterlist]
-    #print(iterlist)
-    #print(iterlist)
-    # instantiate our centroid tracker, then initialize a list to store
-    # each of our dlib correlation trackers, followed by a dictionary to
-    # map each unique object ID to a TrackableObject
-    ct = CentroidTracker(maxDisappeared=40, maxDistance=50)
-    trackers = []
-    trackableObjects = {}
+cap = VideoStream(src=config.url).start()
 
-    # initialize the total number of frames processed thus far, along
-    # with the total number of objects that have moved either up or down
-    totalFrames = 0
-    x = []
-    #if enter_direction == 'down':
-    totalDown = 0
-    totalUp = 0
-    empty=[]
-    empty1=[]
-
-    cap = VideoStream(src=config.url).start()
-
-    if config.Thread:
-            vs = thread.ThreadingClass(config.url)
+if config.Thread:
+        vs = thread.ThreadingClass(config.url)
 
 
+
+# フレームを取得
+
+def capture(q):
     while True:
-        # フレームを取得
-        frame = cap.read()
+        
+        ret, frame = var.cap.read() # read the frames and ---
+        if not ret:
+            break
+        if not q.empty():
+            try:
+                q.get_nowait()
+            except queue.Empty:
+                pass
+        q.put(frame)
+        #frame = vs.read()
 
+def tracker_peo(q):
+    while True:
+        frame = q.get()
+        frame = frame[1] if args.get("input", False) else frame
         try:
             frame = imutils.resize(frame, width = 500)
         except AttributeError:
@@ -114,7 +136,7 @@ def run():
                         input_size=512, conf_thres=0.3, return_img=True
                         )
         detections=Tensor.tolist(detections)
-        objects = ct.update(detections)
+        objects = var.ct.update(detections)
 
         if config.five_mins == True:
             if datetime.datetime.now() >= fivemin:		
@@ -133,11 +155,11 @@ def run():
             if len(peoplechangelist) > 2:
                 del peoplechangelist[:-2]
 
-        # loop over the tracked objects
+            # loop over the tracked objects
         for (objectID, centroid) in objects.items():
             # check to see if a trackable object exists for the current
             # object ID
-            to = trackableObjects.get(objectID, None)
+            to = var.trackableObjects.get(objectID, None)
 
             # if there is no existing trackable object, create one
             if to is None:
@@ -216,8 +238,8 @@ def run():
                                 for i in iterlist:
                                     if centroid[0] > i[0] and centroid[1] < i[1]:
                                 
-                                        totalUp += 1
-                                        empty.append(totalUp)
+                                        var.totalUp += 1
+                                        var.empty.append(var.totalUp)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going up' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'up':
@@ -231,8 +253,8 @@ def run():
                             elif direction > 0:
                                 for i in iterlist:
                                     if centroid[0] < i[0] and centroid[1] > i[1]:
-                                        totalDown += 1
-                                        empty1.append(totalDown)
+                                        var.totalDown += 1
+                                        var.empty1.append(var.totalDown)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going down' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'down':
@@ -246,8 +268,8 @@ def run():
                                 for i in iterlist:
                                     if centroid[1] < i[1]:
                                 
-                                        totalUp += 1
-                                        empty.append(totalUp)
+                                        var.totalUp += 1
+                                        var.empty.append(var.totalUp)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going up' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'up':
@@ -258,8 +280,8 @@ def run():
                             elif direction > 0:
                                 for i in iterlist:
                                     if centroid[1] > i[1]:
-                                        totalDown += 1
-                                        empty1.append(totalDown)
+                                        var.totalDown += 1
+                                        var.empty1.append(var.totalDown)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going down' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'down':
@@ -272,8 +294,8 @@ def run():
                                 for i in iterlist:
                                     if centroid[0] < i[0] and centroid[1] < i[1]:
                                 
-                                        totalUp += 1
-                                        empty.append(totalUp)
+                                        var.totalUp += 1
+                                        var.empty.append(var.totalUp)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going up' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'up':
@@ -284,8 +306,8 @@ def run():
                             elif direction > 0:
                                 for i in iterlist:
                                     if centroid[0] > i[0] and centroid[1] > i[1]:
-                                        totalDown += 1
-                                        empty1.append(totalDown)
+                                        var.totalDown += 1
+                                        var.empty1.append(var.totalDown)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going down' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'down':
@@ -303,8 +325,8 @@ def run():
                                 for i in iterlist:
                                     if centroid[0] < i[0] and centroid[1] > i[1]:
                                 
-                                        totalUp += 1
-                                        empty.append(totalUp)
+                                        var.totalUp += 1
+                                        var.empty.append(var.totalUp)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going left' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'left':
@@ -317,8 +339,8 @@ def run():
                             elif direction > 0:
                                 for i in iterlist:
                                     if centroid[0] > i[0] and centroid[1] < i[1]:
-                                        totalDown += 1
-                                        empty1.append(totalDown)
+                                        var.totalDown += 1
+                                        var.empty1.append(var.totalDown)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going right' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'right':
@@ -331,8 +353,8 @@ def run():
                                 for i in iterlist:
                                     if centroid[0] < i[0]:
                                 
-                                        totalUp += 1
-                                        empty.append(totalUp)
+                                        var.totalUp += 1
+                                        var.empty.append(var.totalUp)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going left' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'left':
@@ -343,8 +365,8 @@ def run():
                             elif direction > 0:
                                 for i in iterlist:
                                     if centroid[0] > i[0]:
-                                        totalDown += 1
-                                        empty1.append(totalDown)
+                                        var.totalDown += 1
+                                        var.empty1.append(var.totalDown)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going right' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'right':
@@ -357,8 +379,8 @@ def run():
                                 for i in iterlist:
                                     if centroid[0] < i[0] and centroid[1] < i[1]:
                                 
-                                        totalUp += 1
-                                        empty.append(totalUp)
+                                        var.totalUp += 1
+                                        var.empty.append(var.totalUp)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going left' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'left':
@@ -369,8 +391,8 @@ def run():
                             elif direction > 0:
                                 for i in iterlist:
                                     if centroid[0] > i[0] and centroid[1] > i[1]:
-                                        totalDown += 1
-                                        empty1.append(totalDown)
+                                        var.totalDown += 1
+                                        var.empty1.append(var.totalDown)
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going right' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'right':
@@ -380,26 +402,26 @@ def run():
                     x = []
                     # compute the sum of total people inside
                     if enter_direction == 'down' or enter_direction == 'right':
-                        x.append(len(empty1)-len(empty))
+                        x.append(len(var.empty1)-len(var.empty))
                     else:
-                        x.append(len(empty)-len(empty1))
+                        x.append(len(var.empty)-len(var.empty1))
                     #print("Total people inside:", x)
 
 
 
 
             # store the trackable object in our dictionary
-            trackableObjects[objectID] = to
+            var.trackableObjects[objectID] = to
 
         if enter_direction == 'down' or enter_direction == 'right':
             info = [
-            ("Exit", totalUp),
-            ("Enter", totalDown),
+            ("Exit", var.totalUp),
+            ("Enter", var.totalDown),
             ]
         else:
             info = [
-            ("Exit", totalDown),
-            ("Enter", totalUp),        
+            ("Exit", var.totalDown),
+            ("Enter", var.totalUp),        
             ]
 
         info2 = [
@@ -410,12 +432,12 @@ def run():
                         #if len(peoplechangelist) > 0:
             peoplechangelist.append(x)
                                 #print(peoplechangelist)
-        
-    #new_image = np.array(np_img, dtype=np.uint8)
-    #np_img2 = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
-    # フレームを表示
-    #cv2.imshow("Frame", np_img2)
-        
+
+        #new_image = np.array(np_img, dtype=np.uint8)
+        #np_img2 = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
+        # フレームを表示
+        #cv2.imshow("Frame", np_img2)
+
         # フレームを表示
         new_image = np.array(np_img, dtype=np.uint8)
         np_img2 = cv2.cvtColor(new_image, cv2.COLOR_RGB2BGR)
@@ -484,20 +506,54 @@ def run():
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    cap.release()
-    cv2.destroyAllWindows()
+        if config.Scheduler:
+            if datetime.datetime.now() >= tmr :
+                print('renew program')
+                raise KeyboardInterrupt
+
+
+
+
+cap.release()
+cv2.destroyAllWindows()
 #print('finished')
+def start_thread():
+    q= Queue()
+    cam_process = Process(target=capture, args=(q,))
+    cam_process.start()
+    think_process = Process(target=tracker_peo, args=(q,))
+    think_process.start()
+    cam_process.join()
+    think_process.join()
 
 if config.Scheduler:
-	##Runs for every 1 second
-	schedule.every(1).seconds.do(run)
-	##Runs at every day (9:00 am). You can change it.
-	#schedule.every().day.at("9:00").do(run)
-
-	while 1:
+    ##Runs for every 1 second
+    schedule.every(1).seconds.do(start_thread)
+    global tmr
+    
+    ##Runs at every day (9:00 am). You can change it.
+    #schedule.every().day.at("9:00").do(run)
+    while 1:
+        tmr=datetime.datetime.now()
+        try:
+            #tmr=tmr.replace(day=tmr.day + 1, hour=21, minute=12, second=0, microsecond=0)
+            tmr=tmr.replace(day=tmr.day + 1, hour=0, minute=0, second=0, microsecond=0)
+        except ValueError:
             try:
-                schedule.run_pending()
-            except:
-                pass
-else:
-    run()
+                tmr=tmr.replace(month=tmr.month + 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
+            except ValueError:
+                tmr=tmr.replace(year= tmr.year + 1 ,month= 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
+        #print(tmr)
+        #print(datetime.datetime.now())
+        try:
+            schedule.run_pending()
+
+            if datetime.datetime.now() >= tmr:
+                print('renew program')
+                raise ValueError
+                
+        except:
+            print('schedule error')
+            continue
+#else:
+    #run()
