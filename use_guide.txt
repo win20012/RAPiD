@@ -1,7 +1,10 @@
 ################ first time set up ################################
 install python, cmake and anaconda first
+download microsoft build tools at 'https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2019'
 install packages with "pip install -r reqiurement.txt"
-then dlib by conda install -c conda-forge dlib
+then dlib by "conda install -c conda-forge dlib"
+then type "conda install -c conda-forge pycocotools"
+
 ################ instructions #####################################
 most of the adjustable parameters are in config.py in mylib folder
 you can edit it by right click on the file and choose "Edit with IDLE" then choose "Edit with IDLE 3.9" or any type of IDLE

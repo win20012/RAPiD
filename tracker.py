@@ -45,6 +45,16 @@ class variable:
         self.fivemin= datetime.datetime.now()+datetime.timedelta(0,300)
         self.writer = None
         self.do_malier = 1
+        tmr=datetime.datetime.now()
+        try:
+                #tmr=tmr.replace(day=tmr.day + 1, hour=21, minute=12, second=0, microsecond=0)
+            tmr=tmr.replace(day=tmr.day + 1, hour=0, minute=0, second=0, microsecond=0)
+        except ValueError:
+            try:
+                tmr=tmr.replace(month=tmr.month + 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
+            except ValueError:
+                tmr=tmr.replace(year= tmr.year + 1 ,month= 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
+        self.tmr =tmr
 
 var=variable() 
 
@@ -121,9 +131,9 @@ def tracker_peo(q):
             
         try:
 
-            if W is None or H is None:
-                (H, W) = frame.shape[:2]
-                print(f"Frame height  is : {H}, frame width is : {W}")
+            if var.W is None or var.H is None:
+                (var.H, var.W) = frame.shape[:2]
+                print(f"Frame height  is : {var.H}, frame width is : {var.W}")
         except AttributeError:
             print('(H, W) = frame.shape[:2] error')
             raise AttributeError  
@@ -139,12 +149,12 @@ def tracker_peo(q):
         objects = var.ct.update(detections)
 
         if config.five_mins == True:
-            if datetime.datetime.now() >= fivemin:		
+            if datetime.datetime.now() >= var.fivemin:		
                 enterp=info[1][1]
                 exitp=info[0][1]
                 send_req(enterp,exitp)
                 now = datetime.datetime.now()
-                fivemin = now + datetime.timedelta(0,300)
+                var.fivemin = now + datetime.timedelta(0,300)
         if config.people_change == True:
             if len(peoplechangelist) >= 2:
                 if peoplechangelist[-1] != peoplechangelist[-2]:
@@ -243,7 +253,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going up' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'up':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
 
                             # if the direction is positive (indicating the object
@@ -258,7 +268,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going down' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'down':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
                                         #print(empty1[-1])
                                         # if the people limit exceeds over threshold, send an email alert
@@ -273,7 +283,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going up' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'up':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
 
                             
@@ -285,7 +295,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going down' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'down':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
                                         
                         elif 0 < m < 1000000000 and vertical_direction == 1:
@@ -299,7 +309,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going up' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'up':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
 
                             
@@ -311,7 +321,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going down' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'down':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
                                         
                         elif m < 0 and vertical_direction == 0:
@@ -330,7 +340,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going left' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'left':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
 
                             # if the direction is positive (indicating the object
@@ -344,7 +354,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going right' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'right':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
                                         
                         elif m >= 1000000000 and vertical_direction == 0:
@@ -358,7 +368,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going left' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'left':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
 
                             
@@ -370,7 +380,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going right' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'right':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
                                         
                         elif 0 < m < 1000000000 and vertical_direction == 0:
@@ -384,7 +394,7 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going left' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'left':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
 
                             
@@ -396,15 +406,15 @@ def tracker_peo(q):
                                         to.counted = True
                                         print('ID '+ str(to.objectID) + ' going right' + ' direction : ' + str(direction) + ' centroid : ' + str(centroid) + ' pixcel compared to : ' + str(i[0]) + ' ' + str(i[1]))
                                         if enter_direction == 'right':
-                                            check_exceed(x,frame)
+                                            check_exceed(var.x,frame)
                                         break
                                         
-                    x = []
+                    var.x = []
                     # compute the sum of total people inside
                     if enter_direction == 'down' or enter_direction == 'right':
-                        x.append(len(var.empty1)-len(var.empty))
+                        var.x.append(len(var.empty1)-len(var.empty))
                     else:
-                        x.append(len(var.empty)-len(var.empty1))
+                        var.x.append(len(var.empty)-len(var.empty1))
                     #print("Total people inside:", x)
 
 
@@ -425,12 +435,12 @@ def tracker_peo(q):
             ]
 
         info2 = [
-        ("Total people inside", x)
+        ("Total people inside", var.x)
         ]
             #print(peoplechangelist)
         if config.people_change == True:
                         #if len(peoplechangelist) > 0:
-            peoplechangelist.append(x)
+            peoplechangelist.append(var.x)
                                 #print(peoplechangelist)
 
         #new_image = np.array(np_img, dtype=np.uint8)
@@ -507,14 +517,14 @@ def tracker_peo(q):
             break
 
         if config.Scheduler:
-            if datetime.datetime.now() >= tmr :
+            if datetime.datetime.now() >= var.tmr :
                 print('renew program')
-                raise KeyboardInterrupt
+                raise NameError
 
 
 
 
-cap.release()
+#cap.release()
 cv2.destroyAllWindows()
 #print('finished')
 def start_thread():
@@ -525,35 +535,37 @@ def start_thread():
     think_process.start()
     cam_process.join()
     think_process.join()
+if __name__ == '__main__':
 
-if config.Scheduler:
-    ##Runs for every 1 second
-    schedule.every(1).seconds.do(start_thread)
-    global tmr
-    
-    ##Runs at every day (9:00 am). You can change it.
-    #schedule.every().day.at("9:00").do(run)
-    while 1:
-        tmr=datetime.datetime.now()
-        try:
-            #tmr=tmr.replace(day=tmr.day + 1, hour=21, minute=12, second=0, microsecond=0)
-            tmr=tmr.replace(day=tmr.day + 1, hour=0, minute=0, second=0, microsecond=0)
-        except ValueError:
+    q= Queue()
+    if config.Scheduler:
+        ##Runs for every 1 second
+        schedule.every(1).seconds.do(start_thread)
+        
+        
+        ##Runs at every day (9:00 am). You can change it.
+        #schedule.every().day.at("9:00").do(run)
+        while 1:
+            var.tmr=datetime.datetime.now()
             try:
-                tmr=tmr.replace(month=tmr.month + 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
+                #tmr=tmr.replace(day=tmr.day + 1, hour=21, minute=12, second=0, microsecond=0)
+                var.tmr=var.tmr.replace(day=var.tmr.day + 1, hour=0, minute=0, second=0, microsecond=0)
             except ValueError:
-                tmr=tmr.replace(year= tmr.year + 1 ,month= 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
-        #print(tmr)
-        #print(datetime.datetime.now())
-        try:
-            schedule.run_pending()
+                try:
+                    var.tmr=var.tmr.replace(month=var.tmr.month + 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
+                except ValueError:
+                    var.tmr=var.tmr.replace(year= var.tmr.year + 1 ,month= 1, day= 1,hour=0, minute=0, second=0, microsecond=0)
+            #print(tmr)
+            #print(datetime.datetime.now())
+            try:
+                schedule.run_pending()
 
-            if datetime.datetime.now() >= tmr:
-                print('renew program')
-                raise ValueError
-                
-        except:
-            print('schedule error')
-            continue
+                if datetime.datetime.now() >= var.tmr:
+                    print('renew program')
+                    raise ValueError
+                    
+            except:
+                print('schedule error')
+                continue
 #else:
     #run()
