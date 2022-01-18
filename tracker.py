@@ -15,7 +15,7 @@ from mylib import config, thread
 import schedule
 import argparse, imutils
 import cv2, datetime
-
+import os,sys
 from Lineiterator import createLineIterator
 from limitexceed import check_exceed
 from get_requests import send_req
@@ -519,7 +519,7 @@ def tracker_peo(q):
         if config.Scheduler:
             if datetime.datetime.now() >= var.tmr :
                 print('renew program')
-                raise NameError
+                os.execv(sys.executable, ['python'] + sys.argv)
 
 
 
